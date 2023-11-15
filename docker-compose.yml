@@ -1,0 +1,26 @@
+services:
+  router:
+    build:
+      context: ./Router
+      dockerfile: Dockerfile
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5229/health"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+
+  client:
+    build:
+      context: ./Client
+      dockerfile: Dockerfile
+    depends_on:
+      router:
+        condition: service_healthy
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
