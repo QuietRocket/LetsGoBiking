@@ -10,16 +10,8 @@ services:
       interval: 5s
       timeout: 2s
       retries: 10
-
-  client:
-    build:
-      context: ./Client
-      dockerfile: Dockerfile
-    depends_on:
-      router:
-        condition: service_healthy
-    networks:
-      - app-network
+    ports:
+      - "5229:5229"
 
 networks:
   app-network:

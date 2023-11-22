@@ -1,12 +1,13 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.letsgobiking</groupId>
     <artifactId>client</artifactId>
     <version>1.0-SNAPSHOT</version>
-    <packaging>war</packaging>
-    <name>Simple CXF WSDL-first SOAP project using Spring configuration</name>
-    <description>Simple CXF WSDL-first SOAP project using Spring configuration</description>
+    <packaging>jar</packaging>
+    <name>LetsGoBiking Java Client</name>
+    <description>A Heavy Client to interact with the LetsGoBiking backend</description>
     <dependencies>
         <dependency>
             <groupId>org.apache.cxf</groupId>
@@ -46,9 +47,9 @@
                             <wsdlOptions>
                                 <wsdlOption>
                                     <wsdl>
-                                       src/main/webapp/WEB-INF/wsdl/HelloWorld.wsdl
+                                        src/main/resources/Router.wsdl
                                     </wsdl>
-                                    <wsdlLocation>classpath:HelloWorld.wsdl</wsdlLocation>
+                                    <wsdlLocation>classpath:Router.wsdl</wsdlLocation>
                                 </wsdlOption>
                             </wsdlOptions>
                         </configuration>
@@ -80,32 +81,6 @@
         </plugins>
         <pluginManagement>
             <plugins>
-                <plugin>
-                    <!-- mvn clean install tomcat7:run to deploy
-                    Look for "Running war on http://xxx" and
-                    "Setting the server's publish address to be /yyy"
-                    in console output; WSDL browser address will be
-                    concatenation of the two: http://xxx/yyy?wsdl
-                    -->
-                    <groupId>org.apache.tomcat.maven</groupId>
-                    <artifactId>tomcat7-maven-plugin</artifactId>
-                    <version>2.0</version>
-                    <executions>
-                        <execution>
-                            <id>start-tomcat</id>
-                            <goals>
-                                <goal>run-war</goal>
-                            </goals>
-                            <phase>pre-integration-test</phase>
-                            <configuration>
-                                <port>${test.server.port}</port>
-                                <path>/webservice</path>
-                                <fork>true</fork>
-                                <useSeparateTomcatClassLoader>true</useSeparateTomcatClassLoader>
-                            </configuration>
-                        </execution>
-                    </executions>
-                </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
