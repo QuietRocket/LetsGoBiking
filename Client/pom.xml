@@ -47,9 +47,9 @@
                             <wsdlOptions>
                                 <wsdlOption>
                                     <wsdl>
-                                        src/main/resources/Router.wsdl
+                                        http://localhost:5229/Service.svc?wsdl
                                     </wsdl>
-                                    <wsdlLocation>classpath:Router.wsdl</wsdlLocation>
+                                    <wsdlLocation>http://localhost:5229/Service.svc?wsdl</wsdlLocation>
                                 </wsdlOption>
                             </wsdlOptions>
                         </configuration>
