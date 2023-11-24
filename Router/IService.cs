@@ -8,52 +8,120 @@ namespace Router
     public interface IService
     {
         [OperationContract]
-        string GetData(int value);
-
-        [OperationContract]
-        CompositeType GetDataUsingDataContract(CompositeType composite);
+        RouteResponse GetBikeRoute(string origin, string destination);
     }
 
     public class Service : IService
     {
-        public string GetData(int value)
+        public RouteResponse GetBikeRoute(string origin, string destination)
         {
-            return string.Format("You entered: {0}", value);
-        }
+            // Implement the logic to compute the bike route
+            // This may involve API calls to mapping services or internal algorithms
 
-        public CompositeType GetDataUsingDataContract(CompositeType composite)
-        {
-            if (composite == null)
+            // Example return (implement actual logic)
+            return new RouteResponse
             {
-                throw new ArgumentNullException("composite");
-            }
-            if (composite.BoolValue)
-            {
-                composite.StringValue += "Suffix";
-            }
-            return composite;
+                Origin = origin,
+                Destination = destination,
+                TotalDistance = 10.0,
+                TotalDuration = 1000,
+                DirectionSegments = new DirectionSegment[]
+                {
+                    new DirectionSegment
+                    {
+                        Instruction = "Turn left",
+                        Distance = 1.0,
+                        Duration = 100
+                    },
+                    new DirectionSegment
+                    {
+                        Instruction = "Turn right",
+                        Distance = 2.0,
+                        Duration = 200
+                    },
+                    new DirectionSegment
+                    {
+                        Instruction = "Turn left",
+                        Distance = 3.0,
+                        Duration = 300
+                    },
+                    new DirectionSegment
+                    {
+                        Instruction = "Turn right",
+                        Distance = 4.0,
+                        Duration = 400
+                    },
+                    new DirectionSegment
+                    {
+                        Instruction = "Turn left",
+                        Distance = 5.0,
+                        Duration = 500
+                    },
+                    new DirectionSegment
+                    {
+                        Instruction = "Turn right",
+                        Distance = 6.0,
+                        Duration = 600
+                    },
+                    new DirectionSegment
+                    {
+                        Instruction = "Turn left",
+                        Distance = 7.0,
+                        Duration = 700
+                    },
+                    new DirectionSegment
+                    {
+                        Instruction = "Turn right",
+                        Distance = 8.0,
+                        Duration = 800
+                    },
+                    new DirectionSegment
+                    {
+                        Instruction = "Turn left",
+                        Distance = 9.0,
+                        Duration = 900
+                    },
+                    new DirectionSegment
+                    {
+                        Instruction = "Turn right",
+                        Distance = 10.0,
+                        Duration = 1000
+                    }
+                }
+                // Populate other required fields
+            };
         }
     }
 
-    // Use a data contract as illustrated in the sample below to add composite types to service operations.
     [DataContract]
-    public class CompositeType
+    public class RouteResponse
     {
-        bool boolValue = true;
-        string stringValue = "Hello ";
+        [DataMember]
+        public string Origin { get; set; }
 
         [DataMember]
-        public bool BoolValue
-        {
-            get { return boolValue; }
-            set { boolValue = value; }
-        }
+        public string Destination { get; set; }
 
         [DataMember]
-        public string StringValue
-        {
-            get { return stringValue; }
-            set { stringValue = value; }
-        }
+        public double TotalDistance { get; set; }
+
+        [DataMember]
+        public long TotalDuration { get; set; }
+
+        [DataMember]
+        public DirectionSegment[] DirectionSegments { get; set; }
+    }
+
+    [DataContract]
+    public class DirectionSegment
+    {
+        [DataMember]
+        public string Instruction { get; set; }
+
+        [DataMember]
+        public double Distance { get; set; }
+
+        [DataMember]
+        public long Duration { get; set; }
     }
 }
