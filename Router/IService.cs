@@ -4,7 +4,7 @@ using System.Runtime.Serialization;
 
 namespace Router
 {
-    [ServiceContract]
+    [ServiceContract(Namespace = "http://wsdl.letsgobiking.com")]
     public interface IService
     {
         [OperationContract]

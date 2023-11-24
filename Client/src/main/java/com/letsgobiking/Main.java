@@ -1,7 +1,8 @@
 package com.letsgobiking;
 
 import org.apache.cxf.jaxws.JaxWsProxyFactoryBean;
-import org.tempuri.IService;
+import com.letsgobiking.wsdl.*;
+
 
 public class Main {
     public static void main(String[] args) {
