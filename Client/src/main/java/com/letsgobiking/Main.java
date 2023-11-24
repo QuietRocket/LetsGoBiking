@@ -1,21 +1,31 @@
 package com.letsgobiking;
 
-import org.apache.cxf.jaxws.JaxWsProxyFactoryBean;
-import com.letsgobiking.wsdl.*;
-
-
 public class Main {
     public static void main(String[] args) {
-        JaxWsProxyFactoryBean factory = new JaxWsProxyFactoryBean();
-        factory.setServiceClass(IService.class);
-        factory.setAddress("http://localhost:5229/Service.svc");
+        ConsoleUI ui = new ConsoleUI();
+        RouteProcessor routeProcessor = new RouteProcessor();
+        ErrorHandler errorHandler = new ErrorHandler();
 
-        IService port = (IService) factory.create();
+        boolean runApp = true;
+        while (runApp) {
+            try {
+                ui.displayWelcomeMessage();
+                String[] userInput = ui.getUserInput();
 
-        // Call the getData method
-        String response = port.getData(10);
+                if (InputValidator.isValidInput(userInput)) {
+                    ui.displayProcessing();
+                    Route route = routeProcessor.processRoute(userInput[0], userInput[1]);
+                    ui.displayRoute(route);
+                } else {
+                    ui.displayError("Invalid input. Please try again.");
+                }
+            } catch (Exception e) {
+                ui.displayError(errorHandler.getErrorMessage(e));
+            }
 
-        // Print the response
-        System.out.println(response);
+            runApp = ui.askForNewSearch();
+        }
+
+        ui.displayGoodbye();
     }
 }
