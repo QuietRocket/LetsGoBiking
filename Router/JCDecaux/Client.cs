@@ -20,7 +20,7 @@ namespace JCDecaux
         {
             this.apiKey = apiKey;
             var innerHandler = new HttpClientHandler();
-            var cachingHandler = new RedisCaching.Handler(innerHandler);
+            var cachingHandler = new RedisCaching.Handler(innerHandler, "localhost", "LGB");
             httpClient = new HttpClient(cachingHandler);
         }
 
@@ -31,10 +31,7 @@ namespace JCDecaux
             {
                 lock (lockObject)
                 {
-                    if (instance == null)
-                    {
-                        instance = new Client(apiKey);
-                    }
+                    instance ??= new Client(apiKey);
                 }
             }
 
