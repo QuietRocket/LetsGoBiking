@@ -5,6 +5,7 @@ builder.Services.AddHealthChecks();
 builder.Services.AddServiceModelServices();
 builder.Services.AddServiceModelMetadata();
 builder.Services.AddSingleton<IServiceBehavior, UseRequestHeadersForMetadataAddressBehavior>();
+builder.Services.AddSingleton<IServiceBehavior>(new ServiceDebugBehavior { IncludeExceptionDetailInFaults = true });
 
 var app = builder.Build();
 
