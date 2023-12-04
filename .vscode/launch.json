@@ -5,8 +5,15 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "C#: Router Debug",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "${workspaceFolder}/Router/Router.csproj"
+        },
+        
+        {
+            "name": "Java: Client Debug",
             "type": "java",
-            "name": "Client",
             "request": "launch",
             "mainClass": "com.letsgobiking.Main",
             "projectName": "heavyclient"
