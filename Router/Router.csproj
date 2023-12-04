@@ -16,5 +16,8 @@
   <ItemGroup>
     <PackageReference Include="CoreWCF.Primitives" Version="1.*" />
     <PackageReference Include="CoreWCF.Http" Version="1.*" />
+    <PackageReference Include="GoogleApi" Version="5.2.4" />
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 </Project>
