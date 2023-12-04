@@ -1,8 +1,4 @@
-﻿using CoreWCF;
-using System;
-using System.Runtime.Serialization;
-
-namespace Router
+﻿namespace Router
 {
     [ServiceContract(Namespace = "http://wsdl.letsgobiking.com")]
     public interface IService
@@ -13,12 +9,22 @@ namespace Router
 
     public class Service : IService
     {
+        private readonly JCDecaux.Client _jcDecauxClient;
+
+        public Service()
+        {
+            string? apiKey = Environment.GetEnvironmentVariable("JCDECAUX_API_KEY");
+
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                throw new Exception("Missing JCDecaux API key in environment variables");
+            }
+            
+            _jcDecauxClient =  JCDecaux.Client.GetInstance(apiKey);
+        }
+
         public RouteResponse GetBikeRoute(string origin, string destination)
         {
-            // Implement the logic to compute the bike route
-            // This may involve API calls to mapping services or internal algorithms
-
-            // Example return (implement actual logic)
             return new RouteResponse
             {
                 Origin = origin,
