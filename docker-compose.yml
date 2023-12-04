@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     networks:
       - app-network
+    depends_on:
+      - redis
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5229/health"]
       interval: 5s
@@ -12,6 +14,16 @@ services:
       retries: 10
     ports:
       - "5229:5229"
+
+  redis:
+    image: redis:latest
+    networks:
+      - app-network
+    volumes:
+      - ./cache:/data
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
 
 networks:
   app-network:
