@@ -1,5 +1,5 @@
 ﻿using System.Text.Json.Serialization;
-using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace JCDecaux.Models
 {
@@ -19,12 +19,12 @@ namespace JCDecaux.Models
 
         public static Contract? LoadSingleFromJson(string json)
         {
-            return JsonConvert.DeserializeObject<Contract>(json);
+            return JsonSerializer.Deserialize<Contract>(json);
         }
 
         public static List<Contract>? LoadListFromJson(string json)
         {
-            return JsonConvert.DeserializeObject<List<Contract>>(json);
+            return JsonSerializer.Deserialize<List<Contract>>(json);
         }
     }
 }
