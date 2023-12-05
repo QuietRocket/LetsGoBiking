@@ -1,5 +1,7 @@
 using System.Net;
 
+using JCDecaux.Models;
+
 namespace JCDecaux
 {
     public class Client
@@ -40,7 +42,7 @@ namespace JCDecaux
 
         public async Task<List<Contract>> GetContracts()
         {
-            string url = $"https://api.jcdecaux.com/vls/v1/contracts?apiKey={apiKey}";
+            string url = $"https://api.jcdecaux.com/vls/v3/contracts?apiKey={apiKey}";
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("Cache-TTL", CacheTTLYear);
             HttpResponseMessage response = await httpClient.SendAsync(request);
@@ -51,7 +53,7 @@ namespace JCDecaux
 
         public async Task<Station?> GetStation(int stationNumber, string contractName)
         {
-            string url = $"https://api.jcdecaux.com/vls/v1/stations/{stationNumber}?contract={contractName}&apiKey={apiKey}";
+            string url = $"https://api.jcdecaux.com/vls/v3/stations/{stationNumber}?contract={contractName}&apiKey={apiKey}";
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("Cache-TTL", CacheTTLShort);
             HttpResponseMessage response = await httpClient.SendAsync(request);
@@ -68,7 +70,7 @@ namespace JCDecaux
 
         public async Task<List<Station>> GetStations()
         {
-            string url = $"https://api.jcdecaux.com/vls/v1/stations?apiKey={apiKey}";
+            string url = $"https://api.jcdecaux.com/vls/v3/stations?apiKey={apiKey}";
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("Cache-TTL", CacheTTLYear);
             HttpResponseMessage response = await httpClient.SendAsync(request);
@@ -79,7 +81,7 @@ namespace JCDecaux
 
         public async Task<List<Station>> GetStationsByContract(string contractName)
         {
-            string url = $"https://api.jcdecaux.com/vls/v1/stations?contract={contractName}&apiKey={apiKey}";
+            string url = $"https://api.jcdecaux.com/vls/v3/stations?contract={contractName}&apiKey={apiKey}";
             var request = new HttpRequestMessage(HttpMethod.Get, url);
             request.Headers.Add("Cache-TTL", CacheTTLShort);
             HttpResponseMessage response = await httpClient.SendAsync(request);
@@ -92,40 +94,6 @@ namespace JCDecaux
             string json = await response.Content.ReadAsStringAsync();
             List<Station>? stations = Station.LoadListFromJson(json);
             return stations ?? new List<Station>();
-        }
-
-        public async Task<List<Park>> GetParksByContract(string contractName)
-        {
-            string url = $"https://api.jcdecaux.com/parking/v1/contracts/{contractName}/parks?apiKey={apiKey}";
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.Add("Cache-TTL", CacheTTLShort);
-            HttpResponseMessage response = await httpClient.SendAsync(request);
-
-            if (response.StatusCode == HttpStatusCode.BadRequest)
-            {
-                throw new ArgumentException("Invalid contract name or contract does not support parks API", nameof(contractName));
-            }
-
-            string json = await response.Content.ReadAsStringAsync();
-            List<Park>? parks = Park.LoadListFromJson(json);
-            return parks ?? new List<Park>();
-        }
-
-        public async Task<Park?> GetPark(string contractName, int parkNumber)
-        {
-            string url = $"https://api.jcdecaux.com/parking/v1/contracts/{contractName}/parks/{parkNumber}?apiKey={apiKey}";
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.Add("Cache-TTL", CacheTTLShort);
-            HttpResponseMessage response = await httpClient.SendAsync(request);
-
-            if (response.StatusCode == HttpStatusCode.NotFound)
-            {
-                return null;
-            }
-
-            string json = await response.Content.ReadAsStringAsync();
-            Park? park = Park.LoadSingleFromJson(json);
-            return park;
         }
     }
 }
