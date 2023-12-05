@@ -1,15 +1,24 @@
-﻿namespace Router
+﻿using GoogleApi.Entities.Common;
+using GoogleApi.Entities.Common.Enums;
+using GoogleApi.Entities.Maps.Common;
+using GoogleApi.Entities.Maps.Common.Enums;
+using GoogleApi.Entities.Maps.Directions.Request;
+using GoogleApi.Entities.Maps.Directions.Response;
+using GoogleApi.Entities.Maps.Geocoding.Address.Request;
+
+namespace Router
 {
     [ServiceContract(Namespace = "http://wsdl.letsgobiking.com")]
     public interface IService
     {
         [OperationContract]
-        RouteResponse GetBikeRoute(string origin, string destination);
+        Task<RouteResponse> GetBikeRoute(string origin, string destination);
     }
 
     public class Service : IService
     {
         private readonly JCDecaux.Client _jcDecauxClient;
+        private readonly string GoogleMapsApiKey;
 
         public Service()
         {
@@ -21,10 +30,69 @@
             }
             
             _jcDecauxClient =  JCDecaux.Client.GetInstance(apiKey);
+
+            apiKey = Environment.GetEnvironmentVariable("GOOGLE_MAPS_API_KEY");
+
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                throw new Exception("Missing Google Maps API key in environment variables");
+            }
+
+            GoogleMapsApiKey = apiKey;
         }
 
-        public RouteResponse GetBikeRoute(string origin, string destination)
+        private async Task<Coordinate?> ResolveAddress(string address)
         {
+            var request = new AddressGeocodeRequest
+            {
+                Address = address,
+                Key = GoogleMapsApiKey
+            };
+
+            var response = await GoogleApi.GoogleMaps.Geocode.AddressGeocode.QueryAsync(request);
+
+            if (response.Status != Status.Ok)
+            {
+                throw new Exception($"Failed to resolve address {address}");
+            }
+
+            var location = response.Results.FirstOrDefault()?.Geometry.Location;
+            
+            return location;
+        }
+
+        private async Task<DirectionsResponse> ComputePath(Coordinate origin, Coordinate destination, TravelMode travelMode)
+        {
+            var request = new DirectionsRequest
+            {
+                Key = GoogleMapsApiKey,
+                Origin = new LocationEx(new CoordinateEx(origin.Latitude, origin.Longitude)),
+                Destination = new LocationEx(new CoordinateEx(destination.Latitude, destination.Longitude)),
+                TravelMode = travelMode
+            };
+
+            var result = await GoogleApi.GoogleMaps.Directions.QueryAsync(request);
+
+            return result;
+        }
+
+        public async Task<RouteResponse> GetBikeRoute(string origin, string destination)
+        {
+            var originLocationReq = ResolveAddress(origin);
+            var destinationLocationReq = ResolveAddress(destination);
+
+            var originLocation = await originLocationReq;
+            var destinationLocation = await destinationLocationReq;
+
+            if (originLocation == null || destinationLocation == null)
+            {
+                throw new Exception("Failed to resolve origin or destination");
+            }
+
+            var direct = await ComputePath(originLocation, destinationLocation, TravelMode.Bicycling);
+
+            var stations = await _jcDecauxClient.GetStations();
+
             return new RouteResponse
             {
                 Origin = origin,
