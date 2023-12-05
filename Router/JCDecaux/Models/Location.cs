@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Serialization;
+using GoogleApi.Entities.Common;
 
 namespace JCDecaux.Models
 {
@@ -16,6 +17,11 @@ namespace JCDecaux.Models
         public override string ToString()
         {
             return $"latitude: {Latitude}\nlongitude: {Longitude}";
+        }
+
+        public Coordinate ToCoordinate()
+        {
+            return new Coordinate(Latitude, Longitude);
         }
     }
 }
