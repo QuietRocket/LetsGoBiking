@@ -5,6 +5,7 @@ using GoogleApi.Entities.Maps.Common.Enums;
 using GoogleApi.Entities.Maps.Directions.Request;
 using GoogleApi.Entities.Maps.Directions.Response;
 using GoogleApi.Entities.Maps.Geocoding.Address.Request;
+using JCDecaux.Models;
 
 namespace Router
 {
@@ -61,19 +62,76 @@ namespace Router
             return location;
         }
 
+        private LocationEx CoordinateToLocationEx(double latitude, double longitude)
+        {
+            return new LocationEx(new CoordinateEx(latitude, longitude));
+        }
+
         private async Task<DirectionsResponse> ComputePath(Coordinate origin, Coordinate destination, TravelMode travelMode)
         {
             var request = new DirectionsRequest
             {
                 Key = GoogleMapsApiKey,
-                Origin = new LocationEx(new CoordinateEx(origin.Latitude, origin.Longitude)),
-                Destination = new LocationEx(new CoordinateEx(destination.Latitude, destination.Longitude)),
+                Origin = CoordinateToLocationEx(origin.Latitude, origin.Longitude),
+                Destination = CoordinateToLocationEx(destination.Latitude, destination.Longitude),
                 TravelMode = travelMode
             };
 
             var result = await GoogleApi.GoogleMaps.Directions.QueryAsync(request);
 
             return result;
+        }
+
+        public static double ComputeDistance(double lat1, double lon1, double lat2, double lon2)
+        {
+            const double R = 6371; // Radius of the earth in km
+            var latDistance = ToRadians(lat2 - lat1);
+            var lonDistance = ToRadians(lon2 - lon1);
+            var a = Math.Sin(latDistance / 2) * Math.Sin(latDistance / 2)
+                    + Math.Cos(ToRadians(lat1)) * Math.Cos(ToRadians(lat2))
+                    * Math.Sin(lonDistance / 2) * Math.Sin(lonDistance / 2);
+            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+            var distance = R * c; // convert to kilometers
+            return distance;
+        }
+
+        private static double ToRadians(double angle)
+        {
+            return Math.PI * angle / 180.0;
+        }
+
+        private async Task<JCDecaux.Models.Station?> FindClosestStation(Coordinate coordinate, bool isOrigin)
+        {
+            var stations = await _jcDecauxClient.GetStations();
+
+            if (stations == null)
+            {
+                throw new Exception("Failed to get stations");
+            }
+
+            var sortedStations = stations.OrderBy(station => ComputeDistance(coordinate.Latitude, coordinate.Longitude, station.Position.Latitude, station.Position.Longitude));
+            int limit = 10;
+            for (int i = 0; i < Math.Min(sortedStations.Count(), limit); i++)
+            {
+                var currentStation = await _jcDecauxClient.GetStation(sortedStations.ElementAt(i).Number, sortedStations.ElementAt(i).ContractName);
+                if (currentStation == null)
+                {
+                    throw new Exception("Failed to get station");
+                }
+
+                var availability = currentStation.TotalStands.Availability;
+
+                if (isOrigin && availability.Bikes > 0)
+                {
+                    return currentStation;
+                }
+                else if (!isOrigin && availability.Stands > 0)
+                {
+                    return currentStation;
+                }
+            }
+
+            return null;
         }
 
         public async Task<RouteResponse> GetBikeRoute(string origin, string destination)
@@ -89,81 +147,113 @@ namespace Router
                 throw new Exception("Failed to resolve origin or destination");
             }
 
-            var direct = await ComputePath(originLocation, destinationLocation, TravelMode.Bicycling);
+            var originStationReq = FindClosestStation(originLocation, true);
+            var destinationStationReq = FindClosestStation(destinationLocation, false);
 
-            var stations = await _jcDecauxClient.GetStations();
+            var originStation = await originStationReq;
+            var destinationStation = await destinationStationReq;
 
-            return new RouteResponse
+            if (originStation == null || destinationStation == null)
             {
-                Origin = origin,
-                Destination = destination,
-                TotalDistance = 10.0,
-                TotalDuration = 1000,
-                DirectionSegments = new DirectionSegment[]
+                throw new Exception("Failed to find origin or destination station");
+            }
+
+            // Compute path from origin to origin station by walking
+            var originToOriginStationReq = ComputePath(originLocation, originStation.Position.ToCoordinate(), TravelMode.Walking);
+            // Compute path from origin station to destination station by biking
+            var originStationToDestinationStationReq = ComputePath(originStation.Position.ToCoordinate(), destinationStation.Position.ToCoordinate(), TravelMode.Bicycling);
+            // Compute path from destination station to destination by walking
+            var destinationStationToDestinationReq = ComputePath(destinationStation.Position.ToCoordinate(), destinationLocation, TravelMode.Walking);
+
+            // Compute direct path from origin to destination by walking
+            var originToDestinationReq = ComputePath(originLocation, destinationLocation, TravelMode.Walking);
+
+
+            var originToOriginStation = await originToOriginStationReq;
+            var originStationToDestinationStation = await originStationToDestinationStationReq;
+            var destinationStationToDestination = await destinationStationToDestinationReq;
+
+            var originToDestination = await originToDestinationReq;
+
+            if (originToOriginStation == null || originStationToDestinationStation == null || destinationStationToDestination == null || originToDestination == null)
+            {
+                throw new Exception("Failed to compute path");
+            }
+
+            var originToOriginStationLeg = originToOriginStation.Routes.FirstOrDefault()?.Legs.FirstOrDefault();
+            var originStationToDestinationStationLeg = originStationToDestinationStation.Routes.FirstOrDefault()?.Legs.FirstOrDefault();
+            var destinationStationToDestinationLeg = destinationStationToDestination.Routes.FirstOrDefault()?.Legs.FirstOrDefault();
+            var originToDestinationLeg = originToDestination.Routes.FirstOrDefault()?.Legs.FirstOrDefault();
+
+            if (originToOriginStationLeg == null || originStationToDestinationStationLeg == null || destinationStationToDestinationLeg == null || originToDestinationLeg == null)
+            {
+                throw new Exception("Failed to obtain legs");
+            }
+
+            var totalDuration = originToOriginStationLeg.Duration.Value + originStationToDestinationStationLeg.Duration.Value + destinationStationToDestinationLeg.Duration.Value;
+
+            if (totalDuration > originToDestinationLeg.Duration.Value)
+            {
+                return new RouteResponse
                 {
-                    new DirectionSegment
+                    Origin = originToDestinationLeg.StartAddress,
+                    Destination = originToDestinationLeg.EndAddress,
+                    TotalDistance = originToDestinationLeg.Distance.Value,
+                    TotalDuration = originToDestinationLeg.Duration.Value,
+                    DirectionSegments = originToDestinationLeg.Steps.Select(step => new DirectionSegment
                     {
-                        Instruction = "Turn left",
-                        Distance = 1.0,
-                        Duration = 100
-                    },
-                    new DirectionSegment
-                    {
-                        Instruction = "Turn right",
-                        Distance = 2.0,
-                        Duration = 200
-                    },
-                    new DirectionSegment
-                    {
-                        Instruction = "Turn left",
-                        Distance = 3.0,
-                        Duration = 300
-                    },
-                    new DirectionSegment
-                    {
-                        Instruction = "Turn right",
-                        Distance = 4.0,
-                        Duration = 400
-                    },
-                    new DirectionSegment
-                    {
-                        Instruction = "Turn left",
-                        Distance = 5.0,
-                        Duration = 500
-                    },
-                    new DirectionSegment
-                    {
-                        Instruction = "Turn right",
-                        Distance = 6.0,
-                        Duration = 600
-                    },
-                    new DirectionSegment
-                    {
-                        Instruction = "Turn left",
-                        Distance = 7.0,
-                        Duration = 700
-                    },
-                    new DirectionSegment
-                    {
-                        Instruction = "Turn right",
-                        Distance = 8.0,
-                        Duration = 800
-                    },
-                    new DirectionSegment
-                    {
-                        Instruction = "Turn left",
-                        Distance = 9.0,
-                        Duration = 900
-                    },
-                    new DirectionSegment
-                    {
-                        Instruction = "Turn right",
-                        Distance = 10.0,
-                        Duration = 1000
-                    }
-                }
-                // Populate other required fields
-            };
+                        Instruction = step.HtmlInstructions,
+                        Distance = step.Distance.Value,
+                        Duration = step.Duration.Value
+                    }).ToArray()
+                };
+            } else {
+                var directionSegments = new List<DirectionSegment>();
+
+                directionSegments.AddRange(originToOriginStationLeg.Steps.Select(step => new DirectionSegment
+                {
+                    Instruction = step.HtmlInstructions,
+                    Distance = step.Distance.Value,
+                    Duration = step.Duration.Value
+                }));
+
+                directionSegments.Add(new DirectionSegment
+                {
+                    Instruction = "Take a bike at " + originStationToDestinationStationLeg.StartAddress,
+                    Distance = 0,
+                    Duration = 0
+                });
+
+                directionSegments.AddRange(originStationToDestinationStationLeg.Steps.Select(step => new DirectionSegment
+                {
+                    Instruction = step.HtmlInstructions,
+                    Distance = step.Distance.Value,
+                    Duration = step.Duration.Value
+                }));
+
+                directionSegments.Add(new DirectionSegment
+                {
+                    Instruction = "Leave the bike at " + originStationToDestinationStationLeg.EndAddress,
+                    Distance = 0,
+                    Duration = 0
+                });
+
+                directionSegments.AddRange(destinationStationToDestinationLeg.Steps.Select(step => new DirectionSegment
+                {
+                    Instruction = step.HtmlInstructions,
+                    Distance = step.Distance.Value,
+                    Duration = step.Duration.Value
+                }));
+
+                return new RouteResponse
+                {
+                    Origin = originToOriginStationLeg.StartAddress,
+                    Destination = destinationStationToDestinationLeg.EndAddress,
+                    TotalDistance = originToOriginStationLeg.Distance.Value + originStationToDestinationStationLeg.Distance.Value + destinationStationToDestinationLeg.Distance.Value,
+                    TotalDuration = originToOriginStationLeg.Duration.Value + originStationToDestinationStationLeg.Duration.Value + destinationStationToDestinationLeg.Duration.Value,
+                    DirectionSegments = directionSegments.ToArray()
+                };
+            }
         }
     }
 
