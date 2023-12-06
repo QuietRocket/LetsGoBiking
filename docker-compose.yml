@@ -1,19 +1,22 @@
 services:
-  router:
-    build:
-      context: ./Router
-      dockerfile: Dockerfile
-    networks:
-      - app-network
-    depends_on:
-      - redis
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5229/health"]
-      interval: 5s
-      timeout: 2s
-      retries: 10
-    ports:
-      - "5229:5229"
+  # TODO: Fix issues with router. Currently, it is not working.
+  # Client is unable to connect. Maybe exposed port isn't right one (HTTP/HTTPS, etc)
+  # router:
+  #   build:
+  #     context: ./Router
+  #     dockerfile: Dockerfile
+  #   networks:
+  #     - app-network
+  #   depends_on:
+  #     - redis
+  #     - activemq
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:5229/health"]
+  #     interval: 5s
+  #     timeout: 2s
+  #     retries: 10
+  #   ports:
+  #     - "5229:5229"
 
   redis:
     image: redis:latest
