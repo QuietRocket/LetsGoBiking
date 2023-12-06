@@ -1,11 +1,12 @@
-﻿using GoogleApi.Entities.Common;
+﻿using Apache.NMS;
+using Apache.NMS.ActiveMQ;
+using GoogleApi.Entities.Common;
 using GoogleApi.Entities.Common.Enums;
 using GoogleApi.Entities.Maps.Common;
 using GoogleApi.Entities.Maps.Common.Enums;
 using GoogleApi.Entities.Maps.Directions.Request;
 using GoogleApi.Entities.Maps.Directions.Response;
 using GoogleApi.Entities.Maps.Geocoding.Address.Request;
-using JCDecaux.Models;
 
 namespace Router
 {
@@ -14,6 +15,9 @@ namespace Router
     {
         [OperationContract]
         Task<RouteResponse> GetBikeRoute(string origin, string destination);
+
+        [OperationContract]
+        Task<RouteResponseWithoutSegments> GetBikeRouteWithQueue(string origin, string destination);
     }
 
     public class Service : IService
@@ -29,8 +33,8 @@ namespace Router
             {
                 throw new Exception("Missing JCDecaux API key in environment variables");
             }
-            
-            _jcDecauxClient =  JCDecaux.Client.GetInstance(apiKey);
+
+            _jcDecauxClient = JCDecaux.Client.GetInstance(apiKey);
 
             apiKey = Environment.GetEnvironmentVariable("GOOGLE_MAPS_API_KEY");
 
@@ -58,7 +62,7 @@ namespace Router
             }
 
             var location = response.Results.FirstOrDefault()?.Geometry.Location;
-            
+
             return location;
         }
 
@@ -134,6 +138,15 @@ namespace Router
             return null;
         }
 
+        public string ConstructSegmentString(
+            string instruction,
+            double distance,
+            long duration
+        )
+        {
+            return $"{instruction} ({distance} km, {duration} minutes)";
+        }
+
         public async Task<RouteResponse> GetBikeRoute(string origin, string destination)
         {
             var originLocationReq = ResolveAddress(origin);
@@ -194,56 +207,33 @@ namespace Router
 
             if (totalDuration > originToDestinationLeg.Duration.Value)
             {
+                var directionSegments = originToDestinationLeg.Steps.Select(step => ConstructSegmentString(step.HtmlInstructions, step.Distance.Value, step.Duration.Value)).ToList();
+                directionSegments.Add("Arrived!");
+
                 return new RouteResponse
                 {
                     Origin = originToDestinationLeg.StartAddress,
                     Destination = originToDestinationLeg.EndAddress,
                     TotalDistance = originToDestinationLeg.Distance.Value,
                     TotalDuration = originToDestinationLeg.Duration.Value,
-                    DirectionSegments = originToDestinationLeg.Steps.Select(step => new DirectionSegment
-                    {
-                        Instruction = step.HtmlInstructions,
-                        Distance = step.Distance.Value,
-                        Duration = step.Duration.Value
-                    }).ToArray()
+                    DirectionSegments = directionSegments.ToArray()
                 };
-            } else {
-                var directionSegments = new List<DirectionSegment>();
+            }
+            else
+            {
+                var directionSegments = new List<string>();
 
-                directionSegments.AddRange(originToOriginStationLeg.Steps.Select(step => new DirectionSegment
-                {
-                    Instruction = step.HtmlInstructions,
-                    Distance = step.Distance.Value,
-                    Duration = step.Duration.Value
-                }));
+                directionSegments.AddRange(originToOriginStationLeg.Steps.Select(step => ConstructSegmentString(step.HtmlInstructions, step.Distance.Value, step.Duration.Value)));
 
-                directionSegments.Add(new DirectionSegment
-                {
-                    Instruction = "Take a bike at " + originStationToDestinationStationLeg.StartAddress,
-                    Distance = 0,
-                    Duration = 0
-                });
+                directionSegments.Add("Take a bike at " + originStationToDestinationStationLeg.StartAddress);
 
-                directionSegments.AddRange(originStationToDestinationStationLeg.Steps.Select(step => new DirectionSegment
-                {
-                    Instruction = step.HtmlInstructions,
-                    Distance = step.Distance.Value,
-                    Duration = step.Duration.Value
-                }));
+                directionSegments.AddRange(originStationToDestinationStationLeg.Steps.Select(step => ConstructSegmentString(step.HtmlInstructions, step.Distance.Value, step.Duration.Value)));
 
-                directionSegments.Add(new DirectionSegment
-                {
-                    Instruction = "Leave the bike at " + originStationToDestinationStationLeg.EndAddress,
-                    Distance = 0,
-                    Duration = 0
-                });
+                directionSegments.Add("Leave the bike at " + originStationToDestinationStationLeg.EndAddress);
 
-                directionSegments.AddRange(destinationStationToDestinationLeg.Steps.Select(step => new DirectionSegment
-                {
-                    Instruction = step.HtmlInstructions,
-                    Distance = step.Distance.Value,
-                    Duration = step.Duration.Value
-                }));
+                directionSegments.AddRange(destinationStationToDestinationLeg.Steps.Select(step => ConstructSegmentString(step.HtmlInstructions, step.Distance.Value, step.Duration.Value)));
+
+                directionSegments.Add("Arrived!");
 
                 return new RouteResponse
                 {
@@ -253,6 +243,44 @@ namespace Router
                     TotalDuration = originToOriginStationLeg.Duration.Value + originStationToDestinationStationLeg.Duration.Value + destinationStationToDestinationLeg.Duration.Value,
                     DirectionSegments = directionSegments.ToArray()
                 };
+            }
+        }
+
+        public async Task<RouteResponseWithoutSegments> GetBikeRouteWithQueue(string origin, string destination)
+        {
+            var routeResponse = await GetBikeRoute(origin, destination);
+            var routeIdentifier = Guid.NewGuid().ToString();
+
+            // Iterate over each DirectionSegment
+            foreach (var segment in routeResponse.DirectionSegments)
+            {
+                SendToQueue(segment, routeIdentifier);
+            }
+
+            return new RouteResponseWithoutSegments
+            {
+                Origin = routeResponse.Origin,
+                Destination = routeResponse.Destination,
+                TotalDistance = routeResponse.TotalDistance,
+                TotalDuration = routeResponse.TotalDuration,
+                RouteIdentifier = routeIdentifier
+            };
+        }
+
+        // ActiveMQ logic to send messages
+        private void SendToQueue(string serializedData, string routeIdentifier)
+        {
+            IConnectionFactory factory = new ConnectionFactory("activemq:tcp://localhost:61616");
+            using (IConnection connection = factory.CreateConnection("artemis", "artemis"))
+            using (Apache.NMS.ISession session = connection.CreateSession())
+            {
+                IDestination destination = session.GetQueue("segments");
+                using (IMessageProducer producer = session.CreateProducer(destination))
+                {
+                    ITextMessage message = session.CreateTextMessage(serializedData);
+                    message.NMSCorrelationID = routeIdentifier;
+                    producer.Send(message);
+                }
             }
         }
     }
@@ -273,19 +301,25 @@ namespace Router
         public long TotalDuration { get; set; }
 
         [DataMember]
-        public DirectionSegment[] DirectionSegments { get; set; }
+        public string[] DirectionSegments { get; set; }
     }
 
     [DataContract]
-    public class DirectionSegment
+    public class RouteResponseWithoutSegments
     {
         [DataMember]
-        public string Instruction { get; set; }
+        public string Origin { get; set; }
 
         [DataMember]
-        public double Distance { get; set; }
+        public string Destination { get; set; }
 
         [DataMember]
-        public long Duration { get; set; }
+        public double TotalDistance { get; set; }
+
+        [DataMember]
+        public long TotalDuration { get; set; }
+
+        [DataMember]
+        public string RouteIdentifier { get; set; }
     }
 }

@@ -34,7 +34,12 @@
             <groupId>jakarta.xml.bind</groupId>
             <artifactId>jakarta.xml.bind-api</artifactId>
             <version>3.0.1</version>
-        </dependency>        
+        </dependency>
+        <dependency>
+            <groupId>org.apache.activemq</groupId>
+            <artifactId>activemq-client</artifactId>
+            <version>6.0.1</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -47,11 +52,11 @@
                     <executable>java</executable>
                     <arguments>
                         <argument>-cp</argument>
-                        <classpath/>
+                        <classpath />
                         <argument>com.letsgobiking.Main</argument>
                     </arguments>
                 </configuration>
-              </plugin>
+            </plugin>
             <plugin>
                 <groupId>org.apache.cxf</groupId>
                 <artifactId>cxf-codegen-plugin</artifactId>
